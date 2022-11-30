@@ -1,0 +1,125 @@
+- name: ----- install firewalld  && nfs  centos ---------------
+  yum:
+    name: "{{item}}"
+    state: present
+  loop:
+    - firewalld
+    - nfs-utils
+  when: 
+    - ansible_distribution=="CentOS"
+    - ansible_distribution_major_version=="7"
+  tags: install_firewall_nfs
+
+- name: ----- install firewalld  && nfs ubuntu ---------------
+  yum:
+    name: "{{item}}"
+    state: present
+  loop:
+    - firewalld
+    - nfs-kernel-server
+  when: 
+    - ansible_distribution=="Ubuntu"
+    - ansible_distribution_major_version=="22"
+  tags: install_firewall_nfs
+
+- name: ----- start & enable firewalld centos ----------
+  service:
+    name: "{{item}}"
+    enabled: yes
+    state: started
+  loop:
+    - firewalld
+    - nfs-server
+  when:
+      - ansible_distribution=="CentOS"
+      - ansible_distribution_major_version=="7"
+  tags: start_firewalld
+
+
+- name: ----- start & enable firewalld ubuntu ----------
+  service:
+    name: "{{item}}"
+    enabled: yes
+    state: started
+  loop:
+    - firewalld
+    - nfs-kernel-server
+  when:
+      - ansible_distribution=="Ubuntu"
+      - ansible_distribution_major_version=="22"
+  tags: start_firewalld
+
+- name: ----- allow ssh and nfs over firewalld ---------
+  firewalld:
+    service: "{{item}}"
+    permanent: yes
+    zone: public
+    state: enabled
+    immediate: true
+  loop:
+    - ssh
+    - nfs
+  tags: config_firewall
+
+- name: ----- create shared directory -----
+  file:
+    path: /mnt/data1
+    state: directory
+    owner: nobody
+    group: nogroup
+    mode: 0755
+  when:
+      - ansible_distribution=="Ubuntu"
+      - ansible_distribution_major_version=="22"
+  tags: create_shared_dir
+
+- name: ----- create shared directory -----
+  file:
+    path: /mnt/data1
+    state: directory
+    owner: nfsnobody
+    group: nfsnobody
+    mode: 0755
+  when:
+      - ansible_distribution=="CentOS"
+      - ansible_distribution_major_version=="7"
+  tags: create_shared_dir
+
+- name: ----- create /etc/exports ----
+  file:
+    path: /etc/exports
+    state: touch
+  tags: exports
+- name: ---- config nfs on server --------
+  lineinfile:
+    line: "/mnt/data1 {{item}}(rw,sync,no_root_squash,no_subtree_check)"
+    path: /etc/exports
+  with_items:
+    - "{{groups.nfs_client}}"
+  when: server_role=='nfsserver'
+  tags: config_server_export
+
+- name: ---- config nfs on client --------
+  lineinfile:
+    line: "/mnt/data1 {{item}}(rw,sync,no_root_squash,no_subtree_check)"
+    path: /etc/exports
+  with_items:
+    - "{{groups.nfs_srv}}"
+  when: server_role=='nfsclient'
+  tags: config_client_export
+
+- name: --- exportfs ----------
+  shell: "exportfs -arv"
+  tags: exportfs
+
+- name: ---------- mount the nfs -------
+  mount:
+    src: "{{item}}:/mnt/data1"
+    path: /mnt/data1
+    opts: rw,sync,hard,intr
+    state: mounted
+    fstype: nfs
+  with_items:
+    - "{{groups.nfs_srv}}"
+  when: server_role=='nfsclient'
+  tags: mount_nfs
