@@ -11,7 +11,7 @@
   tags: install_firewall_nfs
 
 - name: ----- install firewalld  && nfs ubuntu ---------------
-  yum:
+  apt:
     name: "{{item}}"
     state: present
   loop:
@@ -61,7 +61,7 @@
     - nfs
   tags: config_firewall
 
-- name: ----- create shared directory -----
+- name: ----- create shared directory ubuntu -----
   file:
     path: /mnt/data1
     state: directory
@@ -73,7 +73,7 @@
       - ansible_distribution_major_version=="22"
   tags: create_shared_dir
 
-- name: ----- create shared directory -----
+- name: ----- create shared directory centos -----
   file:
     path: /mnt/data1
     state: directory
